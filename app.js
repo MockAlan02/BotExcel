@@ -1,27 +1,30 @@
 import "dotenv/config";
 import bot from "@bot-whatsapp/bot";
-import { getDay } from "date-fns";
 import QRPortalWeb from "@bot-whatsapp/portal";
 import BaileysProvider from "@bot-whatsapp/provider/baileys";
 import MockAdapter from "@bot-whatsapp/database/mock";
 
-import chatgpt from "./services/openai/chatgpt.js";
+import ChatGpt from "./services/openai/chatgpt.js";
 import GoogleSheetService from "./services/sheets/index.js";
-
+const chatgpt = new ChatGpt();
 const googelSheet = new GoogleSheetService(
-  "13IjMnMBrSsF0Ijdf_8TEP0JFjw7H7WbRTj53j00Z5Rs"
+  process.env.ExcelUrl
+  "1Qey5DU5rEsXzayrA28_TkP-Hc9P8-CHTI3LAeew1YYc"
 );
 
 const GLOBAL_STATE = [];
+const saludos = ["Hola", "Buenas", "Buenos", "Saludos", "Qué tal", "Hola qué tal", "Hola!", "Hey", "Hola de nuevo", "Hola amigo", "¡Hola!", "Hola a todos"];
 
 const flowPrincipal = bot
-  .addKeyword(["hola", "hi"])
-  .addAnswer([
-    `Bienvenidos a mi restaurante de cocina economica automatizado! 🚀`,
-    `Tenemos menus diarios variados`,
-    `Te gustaria conocerlos ¿?`,
-    `Escribe *menu*`,
-  ]);
+  .addKeyword(saludos)
+  .addAction({ capture: true }, async (ctx, { flowDynamic, fallBack }) => {
+    var regex = /\bmenu\b/i;
+    var coincidencias = ctx.body.match(regex);
+    if (!coincidencias) {
+      flowDynamic(await chatgpt.handleMsg(ctx));
+      return fallBack();
+    }
+  });
 
 const flowMenu = bot
   .addKeyword("menu")
@@ -29,8 +32,7 @@ const flowMenu = bot
     `Hoy tenemos el siguiente menu:`,
     null,
     async (_, { flowDynamic }) => {
-      const dayNumber = getDay(new Date());
-      const getMenu = await googelSheet.retriveDayMenu(dayNumber);
+      const getMenu = await googelSheet.retriveDayMenu();
       for (const menu of getMenu) {
         GLOBAL_STATE.push(menu);
         await flowDynamic(menu);
@@ -43,22 +45,16 @@ const flowMenu = bot
     async (ctx, { gotoFlow, state }) => {
       const txt = ctx.body;
       const check = await chatgpt.completion(`
-    Hoy el menu de comida es el siguiente:
-    "
-    ${GLOBAL_STATE.join("\n")}
+    Nuestros productos son:
+    "9TATE.join("\n")}
     "
     El cliente quiere "${txt}"
-    Basado en el menu y lo que quiere el cliente determinar (EXISTE, NO_EXISTE).
+    Basado en lo que tenemos en el menu y lo que quiere el cliente determinar (EXISTE, NO_EXISTE).
     La orden del cliente
     `);
 
       const getCheck = check.choices[0].message.content;
       console.log("Check: ", getCheck);
-        // .trim()
-        // .replace("\n", "")
-        // .replace(".", "")
-        // .replace(" ", "");
-      // console.log("Check: ", getCheck);
       if (getCheck.includes("NO_EXISTE")) {
         return gotoFlow(flowEmpty);
       } else {
