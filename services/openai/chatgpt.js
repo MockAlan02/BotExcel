@@ -10,6 +10,8 @@ const contenidoPrompt = fs.readFileSync(
   "./services/openai/prompt/VENDEDOR.txt",
   "utf-8"
 );
+
+
 class ChatGpt {
   openai = null;
   openai2 = null;
@@ -44,7 +46,7 @@ class ChatGpt {
 
   handleMsg = async (ctx) => {
     const { from, body } = ctx;
-  
+
     const completion = await this.openai2.sendMessage(body, {
       systemMessage: contenidoPrompt,
       conversationId: !this.queue.length

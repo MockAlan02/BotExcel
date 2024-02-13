@@ -41,12 +41,12 @@ const flowMenu = bot
         await flowDynamic(menu);
       }
 
-      menuString += ""
+      menuString += "\nTe interesa alguno de los productos que tenemos disponibles?"
 
     }
   )
   .addAnswer(
-    "Te interesa alguno de los productos que tenemos disponibles?",
+    "",
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       const txt = ctx.body;
@@ -54,9 +54,9 @@ const flowMenu = bot
     Nuestros productos son:
     "9TATE.join("\n")}
     "
-
     El cliente quiere "${txt}"
-    Basado en lo que tenemos en el menu y lo que quiere el cliente, decir (EXISTE, NO_EXISTE).
+    Basado en lo que tenemos en el menu y lo que quiere el cliente determinar (EXISTE, NO_EXISTE).
+    La orden del cliente
     `);
 
       const getCheck = check.choices[0].message.content;
@@ -76,7 +76,7 @@ const flowMenu = bot
 
 const flowEmpty = bot
   .addKeyword(bot.EVENTS.ACTION)
-  .addAnswer("Disculpa, no he entendido tu pedido. Selecciona algo en el menu y se especifico con tu pedido.", null, async (_, { gotoFlow }) => {
+  .addAnswer("Disculpa, no tenemos ese producto en nuestro inventario. Selecciona otra cosa.", null, async (_, { gotoFlow }) => {
     return gotoFlow(flowMenu);
   });
 

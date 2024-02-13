@@ -53,7 +53,7 @@ class GoogleSheetService {
   saveOrder = async (data = {}) => {
     console.log("Data: ", data);
     await this.doc.loadInfo();
-    const sheet = this.doc.sheetsByIndex[1]; // the first sheet
+    const sheet = this.doc.sheetsByIndex[1]; // the second sheet
 
     const order = await sheet.addRow({
       fecha: data.fecha,
