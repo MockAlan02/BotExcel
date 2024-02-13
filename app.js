@@ -51,12 +51,12 @@ const flowMenu = bot
     async (ctx, { gotoFlow, state }) => {
       const txt = ctx.body;
       const check = await chatgpt.completion(`
-    Nuestros productos son:
+    [INFORMACION] Nuestros productos son:
     "9TATE.join("\n")}
     "
 
-    El cliente quiere "${txt}"
-    Basado en lo que tenemos en el menu y lo que quiere el cliente, decir (EXISTE, NO_EXISTE).
+    [INFORMACION] El cliente quiere "${txt}"
+    [INSTRUCCIONES] Basado en lo que tenemos en el menu y lo que quiere el cliente, debes decir (EXISTE, NO_EXISTE).
     `);
 
       const getCheck = check.choices[0].message.content;
