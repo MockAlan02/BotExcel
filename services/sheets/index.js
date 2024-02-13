@@ -24,19 +24,18 @@ class GoogleSheetService {
   }
 
   /**
-   * Recuperar el menu del dia
-   * @param {*} dayNumber
-   * @returns
+   * Conseguir el menu a partir del excel
+
    */
-  retriveDayMenu = async (dayNumber = 0) => {
+  retriveDayMenu = async () => {
     try {
       const list = [];
       await this.doc.loadInfo();
       const sheet = this.doc.sheetsByIndex[0]; // the first sheet
-      await sheet.loadCells("A1:H10");
+      await sheet.loadCells("A1:A10");
       const rows = await sheet.getRows();
       for (const a of Array.from(Array(rows.length).keys())) {
-        const cellA1 = sheet.getCell(a + 1, dayNumber - 1);
+        const cellA1 = sheet.getCell(a + 1, 0);
         list.push(cellA1.value);
       }
 
@@ -64,7 +63,7 @@ class GoogleSheetService {
       observaciones: data.observaciones,
     });
 
-    return order
+    return order;
   };
 }
 
