@@ -1,52 +1,53 @@
-import { Configuration, OpenAIApi } from "openai";
-import fs from "fs";
-import { ChatGPTAPI } from "chatgpt";
+import { Configuration, OpenAIApi } from 'openai'
+import fs from 'fs'
+import { ChatGPTAPI } from 'chatgpt'
 
 /**
  *
  * @returns
  */
 const contenidoPrompt = fs.readFileSync(
-  "./services/openai/prompt/VENDEDOR.txt",
-  "utf-8"
-);
-
+  './services/openai/prompt/VENDEDOR.txt',
+  'utf-8'
+)
 
 class ChatGpt {
-  openai = null;
-  openai2 = null;
-  queue = [];
+  openai = null
+  openai2 = null
+  queue = []
 
-  constructor() {
+  constructor () {
     const configuration = new Configuration({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    this.openai = new OpenAIApi(configuration);
-    this.openai2 = new ChatGPTAPI(configuration);
+      apiKey: process.env.OPENAI_API_KEY
+    })
+    this.openai = new OpenAIApi(configuration)
+    this.openai2 = new ChatGPTAPI(configuration)
   }
 
-  async completion(dataIn = "") {
+  async completion (dataIn = '') {
     try {
       const response = await this.openai.createChatCompletion({
-        model: "gpt-3.5-turbo",
+        model: 'gpt-3.5-turbo',
         messages: [
           // Aquí proporciona el historial de mensajes de la conversación
-          { role: "system", content: "Inicio de la conversación" }, // Mensaje inicial
-          { role: "user", content: dataIn }, // Mensaje del usuario
+          { role: 'system', content: 'Inicio de la conversación' }, // Mensaje inicial
+          { role: 'user', content: dataIn } // Mensaje del usuario
         ],
         max_tokens: 256,
-        temperature: 0,
-      });
-      return response.data;
+        temperature: 0
+      })
+      return response.data
     } catch (error) {
-      console.error("Error al completar el texto:", error);
-      throw error; // Re-throw para manejar el error en un nivel superior si es necesario
+      console.error('Error al completar el texto:', error)
+      throw error // Re-throw para manejar el error en un nivel superior si es necesario
     }
   }
 
-  handleMsg = async (ctx) => {
-    const { from, body } = ctx;
+  addContext = (text) => {
+    this.queue.push(text)
+  }
 
+  handleMsg = async (body) => {
     const completion = await this.openai2.sendMessage(body, {
       systemMessage: contenidoPrompt,
       conversationId: !this.queue.length
@@ -54,17 +55,11 @@ class ChatGpt {
         : this.queue[this.queue.length - 1].conversationId,
       parentMessageId: !this.queue.length
         ? undefined
-        : this.queue[this.queue.length - 1].id,
-    });
+        : this.queue[this.queue.length - 1].id
+    })
 
-    this.queue.push(completion);
-
-    const parseMessage = {
-      ...completion,
-      answer: completion.text,
-    };
-    // sendFlowSimple([parseMessage], from);
-    return completion.text;
-  };
+    this.queue.push(completion)
+    return completion.text
+  }
 }
-export default ChatGpt;
+export default ChatGpt

@@ -4,31 +4,36 @@ import QRPortalWeb from '@bot-whatsapp/portal'
 import BaileysProvider from '@bot-whatsapp/provider/baileys'
 import MockAdapter from '@bot-whatsapp/database/mock'
 
-import ChatGpt from './services/openai/chatgpt.js'
 import GoogleSheetService from './services/sheets/index.js'
-import { waLabelAssociationKey } from '@whiskeysockets/baileys/lib/Store/make-in-memory-store.js'
-const chatgpt = new ChatGpt()
-const googelSheet = new GoogleSheetService(
-  process.env.ExcelUrl
-)
+import run from './services/openai/testgpt.js'
+const googelSheet = new GoogleSheetService(process.env.ExcelUrl)
 
 // DON'T DELETE
-const saludos = ['Hola', 'Buenas', 'Buenos', 'Saludos', 'Qué tal', 'Hola qué tal', 'Hola!', 'Hey', 'Hola de nuevo', 'Hola amigo', '¡Hola!', 'Hola a todos']
+
 const paymentOptions = ['Tarjeta', 'Efectivo', 'Transferencia']
 const productOptions = []
 const order = []
 const orderQuantity = []
 
-const flowPrincipal = bot
-  .addKeyword(saludos)
-  .addAction({ capture: true }, async (ctx, { flowDynamic, fallBack }) => {
-    const regexp = /men[u\u00FA]/gmi
-    const coincidencias = ctx.body.match(regexp)
-    if (!coincidencias) {
-      flowDynamic(await chatgpt.handleMsg(ctx))
-      return fallBack()
+const flowPrincipal = bot.addKeyword([bot.EVENTS.WELCOME]).addAction(async (ctx, { flowDynamic, fallBack, state }) => {
+  try {
+    const mensaje = await ctx.body
+    const regexp = /men[u\u00FA]/gim
+    const coincidencias = mensaje.match(regexp)
+    if (coincidencias) {
+      return
     }
-  })
+
+    const newHistory = (state.getMyState()?.history ?? [])
+    newHistory.push({ role: 'user', content: ctx.body })
+    const ai = await run(newHistory)
+    await flowDynamic(ai)
+    newHistory.push({ role: 'system', content: ai })
+    await state.update({ history: newHistory })
+  } catch (error) {
+    console.log(error)
+  }
+})
 
 const flowMenu = bot
   .addKeyword('menu')
@@ -62,7 +67,7 @@ const flowMenu = bot
       console.log('ITEMS EN INVENTARIO: \n' + productOptions.join('\n'))
 
       let txt = ctx.body
-      const digitsRegexp = /\d+/gmi
+      const digitsRegexp = /\d+/gim
 
       txt = digitsRegexp.test(txt) ? txt.match(digitsRegexp).join(' ') : txt
 
@@ -79,16 +84,19 @@ const flowMenu = bot
         }
       }
     }
-  ).addAnswer(
+  )
+  .addAnswer(
     'Que cantidad desea?',
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       // Log the items in the inventory to be sure everything's all right
       //
       let txt = ctx.body
-      const digitsRegexp = /\d+/gmi
+      const digitsRegexp = /\d+/gim
 
-      txt = digitsRegexp.test(txt) ? parseInt(txt.match(digitsRegexp).join(' ')) : txt
+      txt = digitsRegexp.test(txt)
+        ? parseInt(txt.match(digitsRegexp).join(' '))
+        : txt
 
       if (typeof txt === 'number' && txt > 0) {
         console.log('Cantidad : ', txt)
@@ -98,18 +106,23 @@ const flowMenu = bot
         return gotoFlow(flowEmpty)
       }
     }
-  ).addAnswer(
+  )
+  .addAnswer(
     'Desea algo mas? \n\n1. Sí \n2. No',
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       // Log the items in the inventory to be sure everything's all right
       //
       let txt = ctx.body
-      const digitsRegexp = /\d+/gmi
+      const digitsRegexp = /\d+/gim
 
-      txt = digitsRegexp.test(txt) ? parseInt(txt.match(digitsRegexp).join(' ')) : txt
+      txt = digitsRegexp.test(txt)
+        ? parseInt(txt.match(digitsRegexp).join(' '))
+        : txt
 
-      if (typeof txt !== 'number' || txt !== 1) { return gotoFlow(flowPedido) }
+      if (typeof txt !== 'number' || txt !== 1) {
+        return gotoFlow(flowPedido)
+      }
       if (txt === 1) {
         return gotoFlow(flowMenu)
       }
@@ -120,9 +133,13 @@ const flowMenu = bot
 
 const flowEmpty = bot
   .addKeyword(bot.EVENTS.ACTION)
-  .addAnswer('Disculpa, no he entendido tu pedido. Selecciona algo en el menu.', null, async (_, { gotoFlow }) => {
-    return gotoFlow(flowMenu)
-  })
+  .addAnswer(
+    'Disculpa, no he entendido tu pedido. Selecciona algo en el menu.',
+    null,
+    async (_, { gotoFlow }) => {
+      return gotoFlow(flowMenu)
+    }
+  )
 
 const flowPedido = bot
   .addKeyword(['pedir'], { sensitive: true })
@@ -132,12 +149,13 @@ const flowPedido = bot
     async (ctx, { state }) => {
       state.update({ name: ctx.body })
     }
-  ).addAnswer(
+  )
+  .addAnswer(
     'De que manera desea pagar? \n1. Tarjeta \n2. Efectivo \n3. Transferencia Bancaria',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic, fallBack }) => {
       let txt = ctx.body
-      const digitsRegexp = /\d+/gmi
+      const digitsRegexp = /\d+/gim
 
       txt = digitsRegexp.test(txt) ? txt.match(digitsRegexp).join(' ') : txt
 
@@ -161,40 +179,58 @@ const flowPedido = bot
         }
       }
     }
-  ).addAnswer(
+  )
+  .addAnswer(
     '¿Alguna observacion? (Escribe un mensaje)',
     { capture: true },
     async (ctx, { state }) => {
       state.update({ observaciones: ctx.body })
     }
-  ).addAnswer('Quieres un resumen de tu pedido? \n\n1. Sí \n2. No', { capture: true }, async (ctx, { gotoFlow, state, flowDynamic }) => {
-    let txt = ctx.body
-    const digitsRegexp = /\d+/gmi
+  )
+  .addAnswer(
+    'Quieres un resumen de tu pedido? \n\n1. Sí \n2. No',
+    { capture: true },
+    async (ctx, { gotoFlow, state, flowDynamic }) => {
+      let txt = ctx.body
+      const digitsRegexp = /\d+/gim
 
-    txt = digitsRegexp.test(txt) ? parseInt(txt.match(digitsRegexp).join(' ')) : txt
+      txt = digitsRegexp.test(txt)
+        ? parseInt(txt.match(digitsRegexp).join(' '))
+        : txt
 
-    if (txt === 2) {
-      return
+      if (txt === 2) {
+        return
+      }
+
+      let pedido = ''
+
+      for (let i = 0; i < order.length; i++) {
+        pedido += `\nPedido: ${orderQuantity[i]} x ${order[i]} \n`
+      }
+
+      await flowDynamic(
+        `Aqui tiene un resumen de su pedido: \n\n${pedido} \nNombre: ${
+          state.getMyState().name
+        } \nTipo de pago: ${state.getMyState().tipoPago} \nObservaciones: ${
+          state.getMyState().observaciones
+        }`
+      )
     }
-
-    let pedido = ''
-
-    for (let i = 0; i < order.length; i++) {
-      pedido += `\nPedido: ${orderQuantity[i]} x ${order[i]} \n`
-    }
-
-    await flowDynamic(`Aqui tiene un resumen de su pedido: \n\n${pedido} \nNombre: ${state.getMyState().name} \nTipo de pago: ${state.getMyState().tipoPago} \nObservaciones: ${state.getMyState().observaciones}`)
-  })
+  )
   .addAnswer(
     'Desea algo más? \n\n1. Sí \n2. No',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic }) => {
       let txt = ctx.body
-      const digitsRegexp = /\d+/gmi
+      const digitsRegexp = /\d+/gim
 
-      txt = digitsRegexp.test(txt) ? parseInt(txt.match(digitsRegexp).join(' ')) : txt
+      txt = digitsRegexp.test(txt)
+        ? parseInt(txt.match(digitsRegexp).join(' '))
+        : txt
 
-      if (typeof txt !== 'number' || txt === 2) { return }
+      if (typeof txt !== 'number' || txt === 2) {
+        return
+      }
 
       return gotoFlow(flowMenu)
     }
