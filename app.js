@@ -12,20 +12,29 @@ const googelSheet = new GoogleSheetService(process.env.ExcelUrl)
 
 const paymentOptions = ['Tarjeta', 'Efectivo', 'Transferencia']
 const productOptions = []
-const order = []
-const orderQuantity = []
+let order = []
+let orderQuantity = []
+let orderSpecs = []
 
-const flowPrincipal = bot.addKeyword([bot.EVENTS.WELCOME]).addAction(async (ctx, { flowDynamic, fallBack, state }) => {
+const flowPrincipal = bot.addKeyword([bot.EVENTS.WELCOME]).addAction(async (ctx, { flowDynamic, state, gotoFlow }) => {
   try {
     const mensaje = await ctx.body
-    const regexp = /men[u\u00FA]/gim
+
+    // const regexp = /men[u\u00FA]/gim
+    const regexp = /pedir/gim
     const coincidencias = mensaje.match(regexp)
-    if (coincidencias) {
-      return
-    }
 
     const newHistory = (state.getMyState()?.history ?? [])
+
+    console.log(newHistory)
     newHistory.push({ role: 'user', content: ctx.body })
+
+    // true && true
+    if (coincidencias || mensaje === '1') {
+      console.log('Ahio')
+      return gotoFlow(flowMenu)
+    }
+
     const ai = await run(newHistory)
     await flowDynamic(ai)
     newHistory.push({ role: 'system', content: ai })
@@ -36,9 +45,9 @@ const flowPrincipal = bot.addKeyword([bot.EVENTS.WELCOME]).addAction(async (ctx,
 })
 
 const flowMenu = bot
-  .addKeyword('menu')
+  .addKeyword(['pedir'])
   .addAnswer(
-    'Hoy tenemos el siguiente menu:',
+    'Hoy tenemos las siguientes opciones en inventario:',
     null,
     async (_, { flowDynamic }) => {
       const getMenu = await googelSheet.retriveDayMenu()
@@ -56,6 +65,8 @@ const flowMenu = bot
         id++
       }
 
+      menuString += '\n\nPuedes escribir "Terminar" para salir de este menú.'
+
       await flowDynamic(menuString)
     }
   )
@@ -68,8 +79,14 @@ const flowMenu = bot
 
       let txt = ctx.body
       const digitsRegexp = /\d+/gim
+      const terminarRegexp = /terminar/gim
 
       txt = digitsRegexp.test(txt) ? txt.match(digitsRegexp).join(' ') : txt
+
+      if (terminarRegexp.test(txt)) {
+        console.log('Terminado')
+        return gotoFlow(flowPrincipal)
+      }
 
       for (let i = 0; i < productOptions.length; i++) {
         if (txt > 0 && txt <= productOptions.length) {
@@ -83,6 +100,19 @@ const flowMenu = bot
           return gotoFlow(flowEmpty)
         }
       }
+    }
+  )
+  .addAnswer(
+    'De qué size desea su pedido? (si su pedido no incluye talla, escriba un punto ".")',
+    { capture: true },
+    async (ctx, { gotoFlow, state }) => {
+      // Log the items in the inventory to be sure everything's all right
+      //
+      const txt = ctx.body
+
+      console.log('Spec: ', txt)
+      // state.update({ cantidad: txt })
+      orderSpecs.push(txt)
     }
   )
   .addAnswer(
@@ -108,7 +138,7 @@ const flowMenu = bot
     }
   )
   .addAnswer(
-    'Desea algo mas? \n\n1. Sí \n2. No',
+    'Desea algo mas? \n\n1. Sí \n2. No \n\nCualquier opción fuera del menú se interpreta como "no"',
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       // Log the items in the inventory to be sure everything's all right
@@ -120,23 +150,36 @@ const flowMenu = bot
         ? parseInt(txt.match(digitsRegexp).join(' '))
         : txt
 
-      if (typeof txt !== 'number' || txt !== 1) {
-        return gotoFlow(flowPedido)
-      }
       if (txt === 1) {
         return gotoFlow(flowMenu)
+      } else {
+        return gotoFlow(flowPedido)
       }
+    }
+  )
 
-      return gotoFlow(flowEmpty)
+const flowSalir = bot
+  .addKeyword(bot.EVENTS.ACTION)
+  .addAnswer(
+    'Saliendo...',
+    null,
+    async (_, { gotoFlow }) => {
+      order = []
+      orderSpecs = []
+      orderQuantity = []
+      return gotoFlow(flowPrincipal)
     }
   )
 
 const flowEmpty = bot
   .addKeyword(bot.EVENTS.ACTION)
   .addAnswer(
-    'Disculpa, no he entendido tu pedido. Selecciona algo en el menu.',
+    'Disculpa, no he entendido tu pedido. Selecciona algo en entre las opciones.',
     null,
     async (_, { gotoFlow }) => {
+      order = []
+      orderSpecs = []
+      orderQuantity = []
       return gotoFlow(flowMenu)
     }
   )
@@ -170,7 +213,7 @@ const flowPedido = bot
           console.log('Metodo de pago: ', paymentOption)
 
           state.update({ tipoPago: paymentOption })
-          break
+          return
         }
 
         if (i === paymentOptions.length - 1) {
@@ -181,7 +224,7 @@ const flowPedido = bot
     }
   )
   .addAnswer(
-    '¿Alguna observacion? (Escribe un mensaje)',
+    '¿Tiene alguna observación del producto, como la persona que lo va a recibir,? (Escribe un mensaje)',
     { capture: true },
     async (ctx, { state }) => {
       state.update({ observaciones: ctx.body })
@@ -209,16 +252,14 @@ const flowPedido = bot
       }
 
       await flowDynamic(
-        `Aqui tiene un resumen de su pedido: \n\n${pedido} \nNombre: ${
-          state.getMyState().name
-        } \nTipo de pago: ${state.getMyState().tipoPago} \nObservaciones: ${
-          state.getMyState().observaciones
+        `Aqui tiene un resumen de su pedido: \n\n${pedido} \nNombre: ${state.getMyState().name
+        } \nTipo de pago: ${state.getMyState().tipoPago} \nObservaciones: ${state.getMyState().observaciones
         }`
       )
     }
   )
   .addAnswer(
-    'Desea algo más? \n\n1. Sí \n2. No',
+    'Desea añadir algo a su pedido \n\n1. Sí (mostrar menú) \n2. No',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic }) => {
       let txt = ctx.body
@@ -243,6 +284,7 @@ const flowPedido = bot
       for (let i = 0; i < order.length; i++) {
         state.update({ pedido: order[i] })
         state.update({ cantidad: orderQuantity[i] })
+        state.update({ especificacion: orderSpecs[i] })
 
         const currentState = state.getMyState()
         console.log(currentState.pedido)
@@ -251,6 +293,7 @@ const flowPedido = bot
           fecha: new Date().toDateString(),
           telefono: ctx.from,
           pedido: currentState.pedido,
+          especificacion: currentState.especificacion,
           cantidad: currentState.cantidad,
           nombre: currentState.name,
           tipoPago: currentState.tipoPago,
@@ -268,6 +311,7 @@ const main = async () => {
     flowPrincipal,
     flowMenu,
     flowPedido,
+    flowSalir,
     flowEmpty
   ])
   const adapterProvider = bot.createProvider(BaileysProvider)
