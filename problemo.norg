@@ -1,0 +1,13 @@
+* Current Bot Problems
+
+  - ( ) Hello must be said twice
+  - ( ) Bot sometimes stops answering questions
+  - ( )
+
+* Features to implement
+
+  - (x) Bot must be able to handle multiple orders from one client
+  - ( ) Bot must be able to return to flowPrinciple after an order has been placed
+  - ( ) Use should be able to order things without having to provide all the info
+    - ( ) Update state of the order based on what the user asked for on the second iteration
+    - ( ) Add to the total price to pay
