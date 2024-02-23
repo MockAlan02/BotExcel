@@ -3,9 +3,8 @@ import bot from '@bot-whatsapp/bot'
 import QRPortalWeb from '@bot-whatsapp/portal'
 import BaileysProvider from '@bot-whatsapp/provider/baileys'
 import MockAdapter from '@bot-whatsapp/database/mock'
-
 import GoogleSheetService from './services/sheets/index.js'
-import run from './services/openai/testgpt.js'
+import run from './services/openai/chatgpt.js'
 const googelSheet = new GoogleSheetService(process.env.ExcelUrl)
 
 // DON'T DELETE
