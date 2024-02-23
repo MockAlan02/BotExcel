@@ -10,7 +10,7 @@ class GoogleSheetService {
   jwtFromEnv = undefined
   doc = undefined
 
-  constructor (id = undefined) {
+  constructor(id = undefined) {
     if (!id) {
       throw new Error('ID_UNDEFINED')
     }
@@ -65,6 +65,7 @@ class GoogleSheetService {
       telefono: data.telefono,
       nombre: data.nombre,
       pedido: data.pedido,
+      especificacion: data.especificacion,
       cantidad: data.cantidad,
       tipoPago: data.tipoPago,
       observaciones: data.observaciones
