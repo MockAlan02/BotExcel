@@ -10,7 +10,7 @@ const googelSheet = new GoogleSheetService(process.env.ExcelUrl)
 
 // DON'T DELETE
 
-const paymentOptions = ['Tarjeta', 'Efectivo', 'Transferencia']
+const paymentOptions = ['Efectivo', 'Transferencia']
 const productOptions = []
 let order = []
 let orderQuantity = []
@@ -69,7 +69,7 @@ const flowMenu = bot
     }
   )
   .addAnswer(
-    'Recuerda, por favor, seleccionar un numero de los disponibles entre las opciones.',
+    'Recuerda, por favor, seleccionar solo un numero a la vez de los disponibles entre las opciones.',
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       // Log the items in the inventory to be sure everything's all right
@@ -192,7 +192,7 @@ const flowPedido = bot
     }
   )
   .addAnswer(
-    'De que manera desea pagar? \n1. Tarjeta \n2. Efectivo \n3. Transferencia Bancaria',
+    'De que manera desea pagar? (Selecciona un número) \n1. Efectivo \n2. Transferencia Bancaria',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic, fallBack }) => {
       let txt = ctx.body
@@ -200,24 +200,21 @@ const flowPedido = bot
 
       txt = digitsRegexp.test(txt) ? txt.match(digitsRegexp).join(' ') : txt
 
-      const paymentOption = paymentOptions[parseInt(txt) - 1]
+      console.log(txt)
+
+      const paymentOption = paymentOptions.includes(paymentOptions[parseInt(txt) - 1]) ? paymentOptions[parseInt(txt) - 1] : null
 
       console.log(paymentOption)
 
       console.log(paymentOptions.includes(paymentOption))
 
-      for (let i = 0; i < paymentOptions.length; i++) {
-        if (paymentOptions.includes(paymentOption)) {
-          console.log('Metodo de pago: ', paymentOption)
+      if (paymentOptions.includes(paymentOption)) {
+        console.log('Metodo de pago: ', paymentOption)
 
-          state.update({ tipoPago: paymentOption })
-          return
-        }
-
-        if (i === paymentOptions.length - 1) {
-          flowDynamic('Por favor, selecciona un metodo de pago valido')
-          return fallBack()
-        }
+        state.update({ tipoPago: paymentOption })
+      } else {
+        flowDynamic('Por favor, selecciona un metodo de pago valido')
+        return fallBack()
       }
     }
   )
