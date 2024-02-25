@@ -9,7 +9,7 @@ const googelSheet = new GoogleSheetService(process.env.ExcelUrl)
 
 // DON'T DELETE
 
-const paymentOptions = ['Tarjeta', 'Efectivo', 'Transferencia']
+const paymentOptions = ['Efectivo', 'Transferencia']
 const productOptions = []
 let order = []
 let orderQuantity = []
@@ -28,9 +28,7 @@ const flowPrincipal = bot.addKeyword([bot.EVENTS.WELCOME]).addAction(async (ctx,
     console.log(newHistory)
     newHistory.push({ role: 'user', content: ctx.body })
 
-    // true && true
-    if (coincidencias || mensaje === '1') {
-      console.log('Ahio')
+    if (coincidencias) {
       return gotoFlow(flowMenu)
     }
 
@@ -70,11 +68,11 @@ const flowMenu = bot
     }
   )
   .addAnswer(
-    'Recuerda, por favor, seleccionar un numero',
+    'Recuerda, por favor, seleccionar solo un numero a la vez de los disponibles entre las opciones.',
     { capture: true },
     async (ctx, { gotoFlow, state }) => {
       // Log the items in the inventory to be sure everything's all right
-      console.log('ITEMS EN INVENTARIO: \n' + productOptions.join('\n'))
+      console.log(`ITEMS EN INVENTARIO [1-${productOptions.length}]: \n` + productOptions.join('\n'))
 
       let txt = ctx.body
       const digitsRegexp = /\d+/gim
@@ -193,7 +191,7 @@ const flowPedido = bot
     }
   )
   .addAnswer(
-    'De que manera desea pagar? \n1. Tarjeta \n2. Efectivo \n3. Transferencia Bancaria',
+    'De que manera desea pagar? (Selecciona un número) \n1. Efectivo \n2. Transferencia Bancaria',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic, fallBack }) => {
       let txt = ctx.body
@@ -201,24 +199,21 @@ const flowPedido = bot
 
       txt = digitsRegexp.test(txt) ? txt.match(digitsRegexp).join(' ') : txt
 
-      const paymentOption = paymentOptions[parseInt(txt) - 1]
+      console.log(txt)
+
+      const paymentOption = paymentOptions.includes(paymentOptions[parseInt(txt) - 1]) ? paymentOptions[parseInt(txt) - 1] : null
 
       console.log(paymentOption)
 
       console.log(paymentOptions.includes(paymentOption))
 
-      for (let i = 0; i < paymentOptions.length; i++) {
-        if (paymentOptions.includes(paymentOption)) {
-          console.log('Metodo de pago: ', paymentOption)
+      if (paymentOptions.includes(paymentOption)) {
+        console.log('Metodo de pago: ', paymentOption)
 
-          state.update({ tipoPago: paymentOption })
-          return
-        }
-
-        if (i === paymentOptions.length - 1) {
-          flowDynamic('Por favor, selecciona un metodo de pago valido')
-          return fallBack()
-        }
+        state.update({ tipoPago: paymentOption })
+      } else {
+        flowDynamic('Por favor, selecciona un metodo de pago valido')
+        return fallBack()
       }
     }
   )
@@ -230,7 +225,7 @@ const flowPedido = bot
     }
   )
   .addAnswer(
-    'Quieres un resumen de tu pedido? \n\n1. Sí \n2. No',
+    'Quieres un resumen de tu pedido? \n\n1. Sí \n2. No \n\nCualquier número fuera de las opciones se interpreta como "sí"',
     { capture: true },
     async (ctx, { gotoFlow, state, flowDynamic }) => {
       let txt = ctx.body
@@ -258,7 +253,7 @@ const flowPedido = bot
     }
   )
   .addAnswer(
-    'Desea añadir algo a su pedido \n\n1. Sí (mostrar menú) \n2. No',
+    'Desea añadir algo a su pedido \n\n1. Sí (mostrar menú) \n2. No \n\nCualquier opción fuera del menú se interpreta como "no"',
     { capture: true },
     async (ctx, { state, gotoFlow, flowDynamic }) => {
       let txt = ctx.body
@@ -268,11 +263,9 @@ const flowPedido = bot
         ? parseInt(txt.match(digitsRegexp).join(' '))
         : txt
 
-      if (typeof txt !== 'number' || txt === 2) {
-        return
+      if (txt === 1) {
+        return gotoFlow(flowMenu)
       }
-
-      return gotoFlow(flowMenu)
     }
   )
   .addAnswer(
@@ -303,6 +296,37 @@ const flowPedido = bot
       return gotoFlow(flowPrincipal)
     }
   )
+
+// const flowPedidoTerminado = bot
+//   .addKeyword()
+//   .addAnswer(
+//     'Perfecto! Un representante se estara contactando contigo para informar del estado de tu pedido.',
+//     null,
+//     async (ctx, { state, gotoFlow }) => {
+//       // For each element in the order array (and the order quantity array since they ought to be the same length)
+//       for (let i = 0; i < order.length; i++) {
+//         state.update({ pedido: order[i] })
+//         state.update({ cantidad: orderQuantity[i] })
+//         state.update({ especificacion: orderSpecs[i] })
+//
+//         const currentState = state.getMyState()
+//         console.log(currentState.pedido)
+//         console.log(currentState.cantidad)
+//         await googelSheet.saveOrder({
+//           fecha: new Date().toDateString(),
+//           telefono: ctx.from,
+//           pedido: currentState.pedido,
+//           especificacion: currentState.especificacion,
+//           cantidad: currentState.cantidad,
+//           nombre: currentState.name,
+//           tipoPago: currentState.tipoPago,
+//           observaciones: currentState.observaciones
+//         })
+//       }
+//
+//       return gotoFlow(flowPrincipal)
+//     }
+//   )
 
 const main = async () => {
   const adapterDB = new MockAdapter()
